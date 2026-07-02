@@ -17,6 +17,7 @@ from build_tree import (build_center_single, build_distribute_four,
                         build_left_center_single_right_center_single,
                         build_up_center_single_down_center_single)
 from const import IMAGE_SIZE, RULE_ATTR
+from json_export import export_puzzle_json, save_puzzle_json
 from rendering import (generate_matrix, generate_matrix_answer, imsave, imshow,
                        render_panel)
 from Rule import Rule_Wrapper
@@ -162,6 +163,9 @@ def separate(args, all_configs):
     random.seed(args.seed)
     np.random.seed(args.seed)
 
+    output_format = getattr(args, 'format', 'npz')
+    num_choices = getattr(args, 'num_choices', 6)
+
     for key in all_configs.keys():
         acc = 0
         for k in trange(args.num_samples):
@@ -176,10 +180,10 @@ def separate(args, all_configs):
             root = all_configs[key]
             while True:
                 rule_groups = sample_rules()
-                new_root = root.prune(rule_groups)    
+                new_root = root.prune(rule_groups)
                 if new_root is not None:
                     break
-            
+
             start_node = new_root.sample()
 
             row_1_1 = copy.deepcopy(start_node)
@@ -241,15 +245,6 @@ def separate(args, all_configs):
                     merge_component(to_merge[2], row_3_3, l)
             row_3_1, row_3_2, row_3_3 = to_merge
 
-            imgs = [render_panel(row_1_1),
-                    render_panel(row_1_2),
-                    render_panel(row_1_3),
-                    render_panel(row_2_1),
-                    render_panel(row_2_2),
-                    render_panel(row_2_3),
-                    render_panel(row_3_1),
-                    render_panel(row_3_2),
-                    np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)]
             context = [row_1_1, row_1_2, row_1_3, row_2_1, row_2_2, row_2_3, row_3_1, row_3_2]
             modifiable_attr = sample_attr_avail(rule_groups, row_3_3)
             answer_AoT = copy.deepcopy(row_3_3)
@@ -261,30 +256,50 @@ def separate(args, all_configs):
                 candidates.append(answer_j)
 
             random.shuffle(candidates)
-            answers = []
-            for candidate in candidates:
-                answers.append(render_panel(candidate))
-            # imsave(generate_matrix_answer(imgs + answers), "./experiments/{}/{}.jpg".format(key, k))    
-            
-            image = imgs[0:8] + answers
-            target = candidates.index(answer_AoT)
-            predicted = solve(rule_groups, context, candidates)
-            meta_matrix, meta_target = serialize_rules(rule_groups)
-            structure, meta_structure = serialize_aot(start_node)
-            np.savez("{}/{}/RAVEN_{}_{}.npz".format(args.save_dir, key, k, set_name), image=image, 
-                                                                                      target=target, 
-                                                                                      predict=predicted,
-                                                                                      meta_matrix=meta_matrix,
-                                                                                      meta_target=meta_target, 
-                                                                                      structure=structure,
-                                                                                      meta_structure=meta_structure)
-            with open("{}/{}/RAVEN_{}_{}.xml".format(args.save_dir, key, k, set_name), "w") as f:
-                dom = dom_problem(context + candidates, rule_groups)
-                f.write(dom)
-            
-            if target == predicted:
-                acc += 1
-        print("Accuracy of {}: {}".format(key, float(acc) / args.num_samples))
+
+            if output_format == 'json':
+                # JSON export path
+                puzzle_dict = export_puzzle_json(
+                    key, rule_groups, context, candidates, answer_AoT, num_choices
+                )
+                json_path = "{}/{}/RAVEN_{}_{}.json".format(args.save_dir, key, k, set_name)
+                save_puzzle_json(puzzle_dict, json_path)
+            else:
+                # Original npz + xml path
+                imgs = [render_panel(row_1_1),
+                        render_panel(row_1_2),
+                        render_panel(row_1_3),
+                        render_panel(row_2_1),
+                        render_panel(row_2_2),
+                        render_panel(row_2_3),
+                        render_panel(row_3_1),
+                        render_panel(row_3_2),
+                        np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)]
+                answers = []
+                for candidate in candidates:
+                    answers.append(render_panel(candidate))
+
+                image = imgs[0:8] + answers
+                target = candidates.index(answer_AoT)
+                predicted = solve(rule_groups, context, candidates)
+                meta_matrix, meta_target = serialize_rules(rule_groups)
+                structure, meta_structure = serialize_aot(start_node)
+                np.savez("{}/{}/RAVEN_{}_{}.npz".format(args.save_dir, key, k, set_name), image=image,
+                                                                                          target=target,
+                                                                                          predict=predicted,
+                                                                                          meta_matrix=meta_matrix,
+                                                                                          meta_target=meta_target,
+                                                                                          structure=structure,
+                                                                                          meta_structure=meta_structure)
+                with open("{}/{}/RAVEN_{}_{}.xml".format(args.save_dir, key, k, set_name), "w") as f:
+                    dom = dom_problem(context + candidates, rule_groups)
+                    f.write(dom)
+
+                if target == predicted:
+                    acc += 1
+
+        if output_format != 'json':
+            print("Accuracy of {}: {}".format(key, float(acc) / args.num_samples))
 
 
 def main():
@@ -300,7 +315,12 @@ def main():
     main_arg_parser.add_argument("--val", type=float, default=2,
                                  help="the proportion of the size of validation set")
     main_arg_parser.add_argument("--test", type=float, default=2,
-                                 help="the proportion of the size of test set")                             
+                                 help="the proportion of the size of test set")
+    main_arg_parser.add_argument("--format", type=str, default="npz",
+                                 choices=["npz", "json"],
+                                 help="output format: npz (default) or json for TikZ rendering")
+    main_arg_parser.add_argument("--num-choices", type=int, default=6,
+                                 help="number of answer choices in json format (default: 6)")
     args = main_arg_parser.parse_args()
 
     all_configs = {"center_single": build_center_single(),
