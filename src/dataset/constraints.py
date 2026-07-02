@@ -87,7 +87,7 @@ def rule_constraint(rule_list, num_min, num_max,
                 # at least two configurations
                 # SET_DIFF
                 else:
-                    num_min = (num_max + 2) / 2 - 1
+                    num_min = (num_max + 2) // 2 - 1
                     num_max = num_max - 1
             if rule.attr == "Size":
                 if rule.value > 0:

@@ -71,7 +71,7 @@ def get_mask(entity_bbox, entity_type, entity_size, entity_angle):
     dummy_entity.size = Bunch(get_value=lambda : entity_size)
     dummy_entity.color = Bunch(get_value=lambda : 0)
     dummy_entity.angle = Bunch(get_value=lambda : entity_angle)
-    mask = render_entity(dummy_entity) / 255
+    mask = (render_entity(dummy_entity) / 255).astype(np.uint8)
     return mask
 
 
@@ -85,6 +85,9 @@ def rle_encode(img):
     pixels = img.flatten()
     pixels = np.concatenate([[0], pixels, [0]])
     runs = np.where(pixels[1:] != pixels[:-1])[0] + 1
+    # Ensure even length (pairs of start, length)
+    if len(runs) % 2 != 0:
+        runs = np.append(runs, len(pixels) - 1)
     runs[1::2] -= runs[::2]
     return "[" + ",".join(str(x) for x in runs) + "]"
  

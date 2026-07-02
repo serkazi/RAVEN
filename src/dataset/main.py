@@ -43,7 +43,7 @@ def fuse(args, all_configs):
         else:
             set_name = "test"
         
-        tree_name = random.choice(all_configs.keys())
+        tree_name = random.choice(list(all_configs.keys()))
         root = all_configs[tree_name]
         while True:
             rule_groups = sample_rules()
@@ -155,7 +155,7 @@ def fuse(args, all_configs):
             f.write(dom)
         if target == predicted:
             acc += 1
-    print "Accuracy: {}".format(float(acc) / (args.num_samples * len(all_configs)))
+    print("Accuracy: {}".format(float(acc) / (args.num_samples * len(all_configs))))
 
 
 def separate(args, all_configs):
@@ -284,7 +284,7 @@ def separate(args, all_configs):
             
             if target == predicted:
                 acc += 1
-        print "Accuracy of {}: {}".format(key, float(acc) / args.num_samples)
+        print("Accuracy of {}: {}".format(key, float(acc) / args.num_samples))
 
 
 def main():
